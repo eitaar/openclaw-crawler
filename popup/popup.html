@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Collector</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>OpenClaw Collector</h1>
+
+      <section>
+        <p>Today's count: <strong id="todayCount">0</strong></p>
+        <div class="row">
+          <button id="blockSiteBtn">Don't record this site</button>
+          <button id="previewBtn">Preview & Send</button>
+        </div>
+      </section>
+
+      <section id="previewPanel" hidden>
+        <h2>Pre-send preview</h2>
+        <p class="hint">Review and delete any entry before sending.</p>
+        <ul id="previewList"></ul>
+        <div class="row">
+          <button id="refreshPreviewBtn">Refresh</button>
+          <button id="sendBtn">Confirm & Send</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Settings</h2>
+        <label>Webhook URL <input id="webhookUrl" type="url" placeholder="https://..." /></label>
+        <label>Bearer token <input id="bearerToken" type="password" placeholder="Enter token" /></label>
+        <label>OpenClaw prompt template
+          <textarea id="promptTemplate" rows="6" placeholder="Daily browser log for {{day}}..."></textarea>
+        </label>
+        <p class="hint">Available variables: <code>{{day}}</code>, <code>{{batchId}}</code>, <code>{{itemCount}}</code>, <code>{{entries}}</code>, <code>{{json}}</code>.</p>
+        <label>Entry line template
+          <textarea id="entryTemplate" rows="3" placeholder="{{index}}. {{title}} — {{url}}"></textarea>
+        </label>
+        <p class="hint">Entry variables: <code>{{index}}</code>, <code>{{title}}</code>, <code>{{url}}</code>, <code>{{description}}</code>, <code>{{visitedAt}}</code>, <code>{{hostname}}</code>.</p>
+        <label>Allowlist (one rule per line)
+          <textarea id="allowlist" rows="4" placeholder="example.com\nhttps://example.com/private"></textarea>
+        </label>
+        <label>Denylist (one rule per line)
+          <textarea id="denylist" rows="4" placeholder="bank.com\nhttps://example.com/login"></textarea>
+        </label>
+        <button id="saveSettingsBtn">Save settings</button>
+      </section>
+
+      <section>
+        <h2>Batch history</h2>
+        <ul id="historyList"></ul>
+      </section>
+
+      <p id="status" aria-live="polite"></p>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
