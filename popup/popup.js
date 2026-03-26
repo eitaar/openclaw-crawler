@@ -8,6 +8,7 @@ const el = {
   sendBtn: document.getElementById('sendBtn'),
   webhookUrl: document.getElementById('webhookUrl'),
   bearerToken: document.getElementById('bearerToken'),
+  promptTemplate: document.getElementById('promptTemplate'),
   allowlist: document.getElementById('allowlist'),
   denylist: document.getElementById('denylist'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
@@ -99,12 +100,14 @@ async function loadSettings() {
   el.bearerToken.value = s.bearerToken || '';
   el.allowlist.value = (s.allowlist || []).join('\n');
   el.denylist.value = (s.denylist || []).join('\n');
+  el.promptTemplate.value = s.promptTemplate || '';
 }
 
 async function saveSettings() {
   const payload = {
     webhookUrl: el.webhookUrl.value.trim(),
     bearerToken: el.bearerToken.value,
+    promptTemplate: el.promptTemplate.value,
     allowlist: parseRules(el.allowlist.value),
     denylist: parseRules(el.denylist.value)
   };

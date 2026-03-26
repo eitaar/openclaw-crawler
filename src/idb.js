@@ -40,6 +40,29 @@ export async function deleteVisit(id) {
   return txDone(db, 'visits', 'readwrite', (store) => store.delete(id));
 }
 
+export async function deleteVisitsByDay(day) {
+  const db = await openDb();
+  const tx = db.transaction('visits', 'readwrite');
+  const idx = tx.objectStore('visits').index('byDay');
+  const range = IDBKeyRange.only(day);
+
+  await new Promise((resolve, reject) => {
+    const req = idx.openCursor(range);
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      cursor.delete();
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+
+  await transactionDone(tx);
+}
+
 export async function upsertBatch(batch) {
   const db = await openDb();
   return txDone(db, 'batches', 'readwrite', (store) => store.put(batch));

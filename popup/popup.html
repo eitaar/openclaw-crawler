@@ -32,6 +32,10 @@
         <h2>Settings</h2>
         <label>Webhook URL <input id="webhookUrl" type="url" placeholder="https://..." /></label>
         <label>Bearer token <input id="bearerToken" type="password" placeholder="Enter token" /></label>
+        <label>OpenClaw prompt template
+          <textarea id="promptTemplate" rows="6" placeholder="Daily browser log for {{day}}..."></textarea>
+        </label>
+        <p class="hint">Available variables: <code>{{day}}</code>, <code>{{batchId}}</code>, <code>{{itemCount}}</code>, <code>{{entries}}</code>, <code>{{json}}</code>.</p>
         <label>Allowlist (one rule per line)
           <textarea id="allowlist" rows="4" placeholder="example.com\nhttps://example.com/private"></textarea>
         </label>

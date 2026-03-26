@@ -1,4 +1,4 @@
-import { addVisit, deleteVisit, getAllBatches, getBatch, getVisitsByDay, upsertBatch } from './idb.js';
+import { addVisit, deleteVisit, deleteVisitsByDay, getAllBatches, getBatch, getVisitsByDay, upsertBatch } from './idb.js';
 import { shouldRecord } from './rules.js';
 import { dayKey, isoWithTimezone, normalizeUrl, safeHostname } from './shared.js';
 
@@ -10,7 +10,17 @@ const DEFAULT_SETTINGS = {
   webhookUrl: '',
   bearerToken: '',
   allowlist: [],
-  denylist: []
+  denylist: [],
+  promptTemplate: [
+    'Daily browser log for {{day}}.',
+    'itemCount={{itemCount}}',
+    '',
+    'Entries:',
+    '{{entries}}',
+    '',
+    'JSON payload:',
+    '{{json}}'
+  ].join('\n')
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -173,7 +183,7 @@ async function sendDayBatch(day) {
   await upsertBatch(pendingBatch);
 
   try {
-    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, payload);
+    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, payload, settings.promptTemplate);
     const res = await fetch(settings.webhookUrl, request);
     const responseText = await res.text();
 
@@ -189,6 +199,9 @@ async function sendDayBatch(day) {
     if (!res.ok) {
       return { ok: false, error: `Webhook failed with status ${res.status}: ${responseText || 'no body'}` };
     }
+
+    // Data minimization rule: remove same-day visit rows after successful transmission.
+    await deleteVisitsByDay(day);
 
     return { ok: true, batchId };
   } catch (error) {
@@ -210,7 +223,7 @@ async function resendBatch(batchId) {
   const attempts = Number(batch.attempts || 1) + 1;
 
   try {
-    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, batch.payload);
+    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, batch.payload, settings.promptTemplate);
     const res = await fetch(settings.webhookUrl, request);
     const responseText = await res.text();
 
@@ -249,7 +262,7 @@ async function readConsent() {
   return Boolean(res[CONSENT_KEY]);
 }
 
-function buildWebhookRequest(webhookUrl, bearerToken, payload) {
+function buildWebhookRequest(webhookUrl, bearerToken, payload, promptTemplate = DEFAULT_SETTINGS.promptTemplate) {
   const parsed = new URL(webhookUrl);
   const pathname = parsed.pathname.toLowerCase();
 
@@ -257,7 +270,7 @@ function buildWebhookRequest(webhookUrl, bearerToken, payload) {
   if (pathname.endsWith('/hooks/agent')) {
     // OpenClaw /hooks/agent requires `message` as a string; raw arbitrary payload returns HTTP 400.
     body = {
-      message: buildHookMessage(payload),
+      message: buildHookMessage(payload, promptTemplate),
       name: 'Browser Log Collector',
       wakeMode: 'now',
       deliver: false
@@ -265,7 +278,7 @@ function buildWebhookRequest(webhookUrl, bearerToken, payload) {
   } else if (pathname.endsWith('/hooks/wake')) {
     // OpenClaw /hooks/wake requires `text`; this keeps compatibility for users pointing to wake endpoints.
     body = {
-      text: buildHookMessage(payload),
+      text: buildHookMessage(payload, promptTemplate),
       mode: 'now'
     };
   }
@@ -280,21 +293,20 @@ function buildWebhookRequest(webhookUrl, bearerToken, payload) {
   };
 }
 
-function buildHookMessage(payload) {
+function buildHookMessage(payload, promptTemplate) {
   const preview = (payload.items || [])
     .slice(0, 25)
     .map((item, i) => `${i + 1}. ${item.title || '(untitled)'} — ${item.url}`)
     .join('\n');
 
-  return [
-    `Daily browser log for ${payload.day}.`,
-    `batchId=${payload.batchId}`,
-    `itemCount=${payload.itemCount}`,
-    '',
-    'Entries:',
-    preview || '(no entries)',
-    '',
-    'JSON payload:',
-    JSON.stringify(payload)
-  ].join('\n');
+  const template = String(promptTemplate || DEFAULT_SETTINGS.promptTemplate);
+  const tokens = {
+    '{{day}}': payload.day,
+    '{{batchId}}': payload.batchId,
+    '{{itemCount}}': String(payload.itemCount),
+    '{{entries}}': preview || '(no entries)',
+    '{{json}}': JSON.stringify(payload)
+  };
+
+  return Object.entries(tokens).reduce((acc, [needle, value]) => acc.replaceAll(needle, value), template);
 }

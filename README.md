@@ -47,6 +47,8 @@ This extension uses a **Manifest V3** architecture with:
 - **Manual confirmation before send**: popup uses explicit confirmation dialog; auto-send only runs after consent is set.
 - **Batch replayability**: persisted payload per batch enables resend for any past batch.
 - **OpenClaw hook compatibility**: when webhook URL ends with `/hooks/agent` or `/hooks/wake`, payload is wrapped into the endpoint-specific required schema to avoid `400 invalid payload`.
+- **Prompt customization**: users can edit the OpenClaw prompt template with placeholders for day/count/entries/json.
+- **Post-send minimization**: today's raw visit rows are deleted after a successful send to reduce retained local browsing history.
 
 ## 4) Finalized payload schema
 
