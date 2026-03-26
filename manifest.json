@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "OpenClaw Daily Browsing Log Collector",
+  "description": "Privacy-first daily browsing metadata collector with user-reviewed OpenClaw webhook delivery.",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "OpenClaw Collector",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
