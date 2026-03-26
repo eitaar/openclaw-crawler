@@ -14,13 +14,8 @@ const DEFAULT_SETTINGS = {
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const settings = await readSettings();
-  if (!settings) {
-    await chrome.storage.local.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS });
-  }
   await chrome.alarms.create('daily-send-check', { periodInMinutes: 15 });
 });
-
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== 'daily-send-check') return;
 
