@@ -14,8 +14,13 @@ const DEFAULT_SETTINGS = {
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
+  const settings = await readSettings();
+  if (!settings) {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS });
+  }
   await chrome.alarms.create('daily-send-check', { periodInMinutes: 15 });
 });
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== 'daily-send-check') return;
 
@@ -168,25 +173,21 @@ async function sendDayBatch(day) {
   await upsertBatch(pendingBatch);
 
   try {
-    const res = await fetch(settings.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.bearerToken}`
-      },
-      body: JSON.stringify(payload)
-    });
+    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, payload);
+    const res = await fetch(settings.webhookUrl, request);
+    const responseText = await res.text();
 
     const next = {
       ...pendingBatch,
       status: res.ok ? 'sent' : 'failed',
       responseCode: res.status,
-      lastAttemptAt: isoWithTimezone()
+      lastAttemptAt: isoWithTimezone(),
+      lastResponse: responseText.slice(0, 4000)
     };
     await upsertBatch(next);
 
     if (!res.ok) {
-      return { ok: false, error: `Webhook failed with status ${res.status}` };
+      return { ok: false, error: `Webhook failed with status ${res.status}: ${responseText || 'no body'}` };
     }
 
     return { ok: true, batchId };
@@ -209,26 +210,22 @@ async function resendBatch(batchId) {
   const attempts = Number(batch.attempts || 1) + 1;
 
   try {
-    const res = await fetch(settings.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.bearerToken}`
-      },
-      body: JSON.stringify(batch.payload)
-    });
+    const request = buildWebhookRequest(settings.webhookUrl, settings.bearerToken, batch.payload);
+    const res = await fetch(settings.webhookUrl, request);
+    const responseText = await res.text();
 
     await upsertBatch({
       ...batch,
       attempts,
       status: res.ok ? 'sent' : 'failed',
       responseCode: res.status,
-      lastAttemptAt: isoWithTimezone()
+      lastAttemptAt: isoWithTimezone(),
+      lastResponse: responseText.slice(0, 4000)
     });
 
     return res.ok
       ? { ok: true }
-      : { ok: false, error: `Webhook failed with status ${res.status}` };
+      : { ok: false, error: `Webhook failed with status ${res.status}: ${responseText || 'no body'}` };
   } catch (error) {
     await upsertBatch({
       ...batch,
@@ -250,4 +247,54 @@ async function readSettings() {
 async function readConsent() {
   const res = await chrome.storage.local.get(CONSENT_KEY);
   return Boolean(res[CONSENT_KEY]);
+}
+
+function buildWebhookRequest(webhookUrl, bearerToken, payload) {
+  const parsed = new URL(webhookUrl);
+  const pathname = parsed.pathname.toLowerCase();
+
+  let body = payload;
+  if (pathname.endsWith('/hooks/agent')) {
+    // OpenClaw /hooks/agent requires `message` as a string; raw arbitrary payload returns HTTP 400.
+    body = {
+      message: buildHookMessage(payload),
+      name: 'Browser Log Collector',
+      wakeMode: 'now',
+      deliver: false
+    };
+  } else if (pathname.endsWith('/hooks/wake')) {
+    // OpenClaw /hooks/wake requires `text`; this keeps compatibility for users pointing to wake endpoints.
+    body = {
+      text: buildHookMessage(payload),
+      mode: 'now'
+    };
+  }
+
+  return {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearerToken}`
+    },
+    body: JSON.stringify(body)
+  };
+}
+
+function buildHookMessage(payload) {
+  const preview = (payload.items || [])
+    .slice(0, 25)
+    .map((item, i) => `${i + 1}. ${item.title || '(untitled)'} — ${item.url}`)
+    .join('\n');
+
+  return [
+    `Daily browser log for ${payload.day}.`,
+    `batchId=${payload.batchId}`,
+    `itemCount=${payload.itemCount}`,
+    '',
+    'Entries:',
+    preview || '(no entries)',
+    '',
+    'JSON payload:',
+    JSON.stringify(payload)
+  ].join('\n');
 }

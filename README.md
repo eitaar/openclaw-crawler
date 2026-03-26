@@ -46,6 +46,7 @@ This extension uses a **Manifest V3** architecture with:
 - **Privacy-first defaults**: local/internal/auth/sensitive-query URLs are excluded by default.
 - **Manual confirmation before send**: popup uses explicit confirmation dialog; auto-send only runs after consent is set.
 - **Batch replayability**: persisted payload per batch enables resend for any past batch.
+- **OpenClaw hook compatibility**: when webhook URL ends with `/hooks/agent` or `/hooks/wake`, payload is wrapped into the endpoint-specific required schema to avoid `400 invalid payload`.
 
 ## 4) Finalized payload schema
 
